@@ -1,0 +1,100 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+    <title>Chatbot</title>
+  </head>
+  <body>
+    <div class="chatbot">
+      <header>
+        <h1>Chatbot</h1>
+      </header>
+      <ul class="chatbox"></ul>
+
+      <div class="chat-input">
+        <textarea placeholder="Enter a message"></textarea>
+        <span id="send-btn">send</span>
+      </div>
+    </div>
+
+    <script>
+      const sendChatBtn = document.querySelector("#send-btn");
+      const chatInput = document.querySelector(".chat-input textarea");
+      const chatbox = document.querySelector(".chatbox");
+
+      const inputInitHeight = chatInput.scrollHeight;
+      const maxHeight = 180; // Set the maximum height for the textarea
+
+      // Function to create chat item (li)
+      const createChatLi = (message, className) => {
+        const chatLi = document.createElement("li");
+        chatLi.classList.add("chat", className);
+        chatLi.innerHTML = `<p></p>`;
+        chatLi.querySelector("p").textContent = message;
+        return chatLi;
+      };
+
+      // WebSocket connection
+      const chatSocket = new WebSocket(`ws://${window.location.host}/ws/chat/`);
+
+      // Handle incoming WebSocket messages
+      chatSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        const response = data.text;
+
+        // Delay displaying the response by 1 second
+        setTimeout(() => {
+          const responseLi = createChatLi(response, "incoming");
+          chatbox.appendChild(responseLi);
+          chatbox.scrollTop = chatbox.scrollHeight; // Scroll to the bottom
+        }, 1000);
+      };
+
+      // Handle WebSocket errors
+      chatSocket.onerror = function (e) {
+        console.error("WebSocket error observed:", e);
+      };
+
+      // Handle chat submission
+      const handleChat = () => {
+        const userMessage = chatInput.value.trim();
+        if (!userMessage) return;
+
+        // Display the user's message
+        chatbox.appendChild(createChatLi(userMessage, "outgoing"));
+        chatInput.value = "";
+        chatbox.scrollTop = chatbox.scrollHeight; // Scroll to the bottom
+        chatInput.style.height = `${inputInitHeight}px`; // Reset textarea height
+
+        // Send the user's message to the WebSocket
+        chatSocket.send(
+          JSON.stringify({
+            text: userMessage,
+          })
+        );
+      };
+
+      // Adjust textarea height on input, but with a max height of 180px
+      chatInput.addEventListener("input", () => {
+        chatInput.style.height = "auto"; // Reset height to auto to calculate new height
+        let newHeight = chatInput.scrollHeight; // Calculate new height based on content
+        chatInput.style.height = `${Math.min(newHeight, maxHeight)}px`; // Set height, but not more than maxHeight
+      });
+
+      // Submit chat on Enter key (for larger screens)
+      chatInput.addEventListener("keyup", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 800) {
+          e.preventDefault();
+          handleChat();
+        }
+      });
+
+      // Submit chat on button click
+      sendChatBtn.addEventListener("click", handleChat);
+    </script>
+  </body>
+</html>
